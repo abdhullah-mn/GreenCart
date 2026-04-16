@@ -44,7 +44,7 @@ export const registerUser = async (req,res)=>{
     return res.json({message: error.message});
 }
 }
-
+// Login user : /api/user/login
 export const login = async (req,res)=>{
    try{
      const {email,password} = req.body;
