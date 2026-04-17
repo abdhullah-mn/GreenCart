@@ -13,13 +13,17 @@ await connectDb();
 
 app.use(express.json());
 app.use(cookieParser());
+
+const allowedOrigins = ['http://localhost:3000', 'https://greencart-frontend.vercel.app'];
+
+// allow multiple origins for CORS
 app.use(cors({origin: allowedOrigins, credentials: true})); 
 
 app.use('/api/users', userRoutes);
 
 
-//allow multiple origins for CORS
-const allowedOrigins = ['http://localhost:3000', 'https://greencart-frontend.vercel.app'];
+
+
 
 app.get ('/', (req,res)=>{
     res.send("API is running...");
