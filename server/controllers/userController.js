@@ -81,3 +81,19 @@ catch (error) {
         return res.json({message: error.message});
    }
 }
+
+// /api/user/is-Auth
+export const authUser = async(req,res)=>{
+    try{
+
+        const {userId} = req.body;
+        const user = await User.findById(userId).select('-password'); //.select(-password) is for remove the password data
+        return res.json({success:true, user});
+ 
+    }catch(error){
+
+        console.log(error);
+        return res.json({message: error.message});      
+
+    }
+}
