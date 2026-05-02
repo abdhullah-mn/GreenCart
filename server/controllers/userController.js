@@ -82,8 +82,8 @@ catch (error) {
    }
 }
 
-// /api/user/is-Auth
-export const authUser = async(req,res)=>{
+// /api/seller/is-Auth
+export const isAuth = async(req,res)=>{
     try{
 
         const {userId} = req.body;
@@ -95,5 +95,25 @@ export const authUser = async(req,res)=>{
         console.log(error);
         return res.json({message: error.message});      
 
+    }
+}
+
+//logout user /api/user/sellerLogout
+
+export const userlogout = async (req,res)=>{
+    try{
+
+    //clear the cookie that stires the jwt
+    res.clearCookie("token",{
+        httpOnly:true,
+        secure:process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production'? 'none':'strict',
+
+    });
+    return res.json({success:true, message:"Logged Out"});
+
+    }catch(error){ 
+        console.log(error);
+        return res.json({message: error.message});
     }
 }
