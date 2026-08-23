@@ -1,18 +1,20 @@
-import Order from "../models/orderModel.js";
-import Product from "../models/product.js";
+import Order from "../models/Order.js";
+import Product from "../models/Product.js";
 import Address from "../models/Address.js";
-import { use } from "react";
 
 //place order COD : /api/order/cod
 export const placeOrderCOD = async (req,res)=>{
 try{
-  const {user_id,items,address} = req.body;
+    const {items,address} = req.body;
     if(!address || !items || items.length === 0){
         return res.json({message: "Please provide all the required fields"});
     }
     //if data all are provided we need to calculate the amount of the order
     let amount = await items.reduce(async (acc, item)=> {
         const product = await Product.findById(item.product);
+        if (!product || !product.inStock) {
+            throw new Error("One or more products are unavailable");
+        }
         return (await acc) + (product.offerPrice * item.quantity);
     },0 //this 0 is the initial value of the accumulator 
 );  
@@ -21,7 +23,7 @@ try{
 amount += amount * 0.18; // Assuming a tax rate of 18%
 // Create a new order with the provided details and calculated amount
 const order = new Order({
-    user_id,
+    user_id: req.userId,
     items,
     address,
     amount,
@@ -29,10 +31,11 @@ const order = new Order({
     isPaid: false, // COD orders are not paid at the time of placement
 });
 await order.save();
+res.status(201).json({success: true, order});
 }
 catch(error){
     console.error("Error placing order:", error);
-    res.status(500).json({message: "Internal Server Error"});
+    res.status(400).json({success: false, message: error.message});
 }
 }
 
@@ -40,9 +43,8 @@ catch(error){
 export const getUserOrders = async (req,res)=>{
     try{
 
-        const {userId} = req.body;
         const orders = await Order.find({
-            user_id: userId,
+            user_id: req.userId,
             $or: [
                 {paymentType: 'COD'},
                 {isPaid: true},
@@ -54,6 +56,31 @@ export const getUserOrders = async (req,res)=>{
     }catch(error){
         console.error("Error fetching user orders:", error);
         res.status(500).json({message: "Internal Server Error"});
+    }
+};
+
+export const getOrderById = async (req, res) => {
+    try {
+        const query = req.userId ? {_id: req.params.id, user_id: req.userId} : {_id: req.params.id};
+        const order = await Order.findOne(query).populate('items.product').populate('address');
+        if (!order) return res.status(404).json({success: false, message: "Order not found"});
+        res.json({success: true, order});
+    } catch (error) {
+        res.status(400).json({success: false, message: error.message});
+    }
+};
+
+export const updateOrderStatus = async (req, res) => {
+    try {
+        const allowedStatuses = ['Order Placed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+        if (!allowedStatuses.includes(req.body.status)) {
+            return res.status(400).json({success: false, message: "Invalid order status"});
+        }
+        const order = await Order.findByIdAndUpdate(req.params.id, {status: req.body.status}, {new: true});
+        if (!order) return res.status(404).json({success: false, message: "Order not found"});
+        res.json({success: true, order});
+    } catch (error) {
+        res.status(400).json({success: false, message: error.message});
     }
 };
 

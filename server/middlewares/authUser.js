@@ -5,15 +5,15 @@ const authUser = async (req,res,next)=>{
     const token = req.cookies.token;
 
     if(!token){
-        return res.json({message: "Unauthorized"});
+        return res.status(401).json({success: false, message: "Unauthorized"});
     }
 
     try{
-        const decoded = JsonWebTokenError.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.userId = decoded.id;
         next();
     } catch (error) {
-        return res.json({message: "Invalid token"});
+        return res.status(401).json({success: false, message: "Invalid token"});
 
     }
 }

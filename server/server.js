@@ -1,15 +1,15 @@
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import cors from 'cors';
-import { connect } from 'mongoose';
 import connectDb from './config/db.js';
 import 'dotenv/config';
-import userRoutes from './routes/userRoutes.js';
-import sellerRoutes from './routes/sellerRoutes.js';
+import userRouter from './routes/userRoutes.js';
+import sellerRouter from './routes/sellerRoutes.js';
 import connectCloudinary from './config/cloudinary.js';
 import productRouter from './routes/productRoutes.js';
 import cartRouter from './routes/cartRoutes.js';
 import addressRouter from './routes/addressRoutes.js';
+import orderRouter from './routes/orderRoute.js';
 
 const app = express();
 const port = process.env.PORT || 4000;

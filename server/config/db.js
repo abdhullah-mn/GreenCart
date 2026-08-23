@@ -9,7 +9,8 @@ const connectDb = async ()=>{
         await mongoose.connect( `${process.env.MONGODB_URI}/greencart` ); 
 
     }catch(error){
-        console.error('Error connecting to MongoDB:', error);
+        console.error('Error connecting to MongoDB:', error.message);
+        throw error;
     }
 }
 

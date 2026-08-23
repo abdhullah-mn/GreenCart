@@ -1,9 +1,9 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import { updateCart } from '../controllers/cartController';
-import authUser from '../middleware/authUser.js';
+import { updateCart, getCart } from '../controllers/cartController.js';
+import authUser from '../middlewares/authUser.js';
 
 const cartRouter = express.Router();
+cartRouter.get('/', authUser, getCart);
 cartRouter.post('/update', authUser, updateCart);
 
 export default cartRouter;

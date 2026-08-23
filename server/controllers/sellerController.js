@@ -1,4 +1,6 @@
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+dotenv.config();
 
 
 
@@ -22,11 +24,11 @@ export const sellerLogin = async(req,res)=>{
 
     return res.json ({success: true, message: "Logged In"});
     }else{
-        return res.json({success: true, message: "Invalid Credentials"});
+        return res.status(401).json({success: false, message: "Invalid Credentials"});
     }
     }catch(error){
         console.log(error.message);
-        res.json({success:true, message: error.message});
+        res.status(500).json({success:false, message: error.message});
     }
 
 }

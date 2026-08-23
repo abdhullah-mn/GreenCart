@@ -86,9 +86,11 @@ catch (error) {
 export const isAuth = async(req,res)=>{
     try{
 
-        const {userId} = req.body;
-        const user = await User.findById(userId).select('-password'); //.select(-password) is for remove the password data
-        return res.json({success:true, user});
+        const user = await User.findById(req.userId).select('-password');
+        if (!user) {
+            return res.status(404).json({success: false, message: 'User not found'});
+        }
+        return res.json({success: true, user});
  
     }catch(error){
 
