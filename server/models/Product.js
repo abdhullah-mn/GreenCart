@@ -7,32 +7,29 @@ const productSchema = new mongoose.Schema({
         required: true
     },
     description: {
-        type: Array,
-        required: true
-    },
-    email: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     price: {
         type: Number,
-        required: true
+        required: true,
+        min: 0
     },
     offerPrice: {
         type: Number,
-        required: true
+        required: true,
+        min: 0
     },
     image:{
         type: Array,
         required: true
     },
     category:{
-        type: Array,
+        type: String,
         required:true
     },
     inStock: {
-        type: boolean,
+        type: Boolean,
         default: true
     }
 
