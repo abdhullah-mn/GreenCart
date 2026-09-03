@@ -20,10 +20,34 @@ await connectCloudinary();
 app.use(express.json());
 app.use(cookieParser());
 
-const allowedOrigins = ['http://localhost:3000', 'https://greencart-frontend.vercel.app'];
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'https://greencart-frontend.vercel.app'
+];
 
-// allow multiple origins for CORS
-app.use(cors({origin: allowedOrigins, credentials: true})); 
+const isLocalOrigin = (origin) => {
+  try {
+    const url = new URL(origin);
+    return ['localhost', '127.0.0.1'].includes(url.hostname)
+      && ['http:', 'https:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+};
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || isLocalOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('CORS blocked for origin: ' + origin));
+  },
+  credentials: true,
+}));
 
 app.use('/api/user', userRouter);
 app.use('/api/seller',sellerRouter);
