@@ -1,862 +1,181 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AppContext } from './context/AppContext.jsx';
-import Footer from './components/Footer.jsx';
-import Navbar from './components/Navbar.jsx';
-import ProductCard from './components/ProductCard.jsx';
-import useScrollParallax from './hooks/useScrollParallax.js';
-import './App.css';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, ArrowUpRight, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, Leaf, MapPin, Menu, Minus, PackageCheck, Plus, Search, ShieldCheck, ShoppingBasket, ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserRound, X } from 'lucide-react';
+import { api, categories, money, normalizeProduct, photo, readStorage, sampleProducts, saveStorage, totals } from './shop.js';
 
-const API_BASE = `${import.meta.env.VITE_API_URL || `http://${window.location.hostname}:4000`}/api`;
+function Brand() { return <a className="brand" href="#home" aria-label="Freshora home"><span className="brand-mark"><ShoppingBasket size={24}/><Leaf size={13}/></span>Fresh<span>ora</span><i>®</i></a>; }
+function Img({ src, alt, ...props }) { const [failed, setFailed] = useState(false); return failed || !src ? <div className="image-fallback" role="img" aria-label={alt}><ShoppingBasket/><span>{alt}</span></div> : <img src={src} alt={alt} onError={() => setFailed(true)} {...props}/>; }
 
-const currency = (value) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(Number(value || 0));
-
-const heroSlides = [
-  {
-    title: 'Elevate your daily ritual.',
-    subtitle: 'Thoughtful essentials for calmer mornings and greener living.',
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
-    badge: 'Fresh harvest',
-  },
-  {
-    title: 'Wellness from the inside out.',
-    subtitle: 'Curated organic blends and self-care rituals designed for everyday balance.',
-    image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80',
-    badge: 'Wellness edit',
-  },
-  {
-    title: 'Design for a cleaner home.',
-    subtitle: 'Sustainable home essentials made to feel beautiful and practical.',
-    image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1200&q=80',
-    badge: 'Eco living',
-  },
-];
-
-const categories = [
-  { name: 'Organic Food', icon: '🌿' },
-  { name: 'Wellness', icon: '🍵' },
-  { name: 'Home Goods', icon: '🏡' },
-  { name: 'Eco Living', icon: '♻️' },
-];
-
-const features = [
-  'Only ethically sourced essentials',
-  'Fast eco-conscious delivery',
-  'Clean ingredients and trusted quality',
-  'Designed for a refined lifestyle',
-];
-
-const testimonials = [
-  {
-    name: 'Aisha R.',
-    role: 'Wellness founder',
-    quote: 'GreenCart feels elevated and intentional. It makes healthy living feel luxurious without the waste.',
-  },
-  {
-    name: 'Daniel K.',
-    role: 'Home stylist',
-    quote: 'Every product feels premium and useful. It’s rare to find a storefront this beautiful and genuinely practical.',
-  },
-  {
-    name: 'Sana T.',
-    role: 'Plant parent',
-    quote: 'The quality and presentation are exceptional. It feels like a boutique brand built around real values.',
-  },
-];
-
-function App() {
-  const location = useLocation();
-  const { user, authLoading, logoutUser } = useContext(AppContext);
-  const [darkMode, setDarkMode] = useState(true);
-
+function Dialog({ title, children, onClose, wide = false }) {
+  const ref = useRef(null);
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [location.pathname]);
-
-  if (authLoading) {
-    return <div className="loading-shell">Loading GreenCart...</div>;
-  }
-
-  return (
-    <div className={`app-shell ${darkMode ? 'theme-dark' : ''}`}>
-      <Navbar user={user} onLogout={logoutUser} darkMode={darkMode} setDarkMode={setDarkMode} />
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/shop" element={<ShopPage />} />
-          <Route path="/product/:id" element={<ProductDetailsPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/login" element={<AuthPage mode="login" />} />
-          <Route path="/register" element={<AuthPage mode="register" />} />
-          <Route path="/dashboard" element={<SellerPage />} />
-          <Route path="/seller" element={<SellerPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-      <Footer />
-    </div>
-  );
+    const previous = document.activeElement;
+    ref.current.showModal();
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; previous?.focus(); };
+  }, []);
+  return <dialog ref={ref} className={`dialog ${wide ? 'wide' : ''}`} onCancel={onClose} onClick={e => { if (e.target === ref.current) onClose(); }}><div className="dialog-head"><h2>{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X/></button></div>{children}</dialog>;
 }
 
-function HomePage() {
-  const { products } = useContext(AppContext);
-  const featured = products.slice(0, 4);
-
-  return (
-    <>
-      <HeroSlider />
-
-      <section className="container section-block">
-        <div className="section-header">
-          <div>
-            <span className="eyebrow">Green essentials</span>
-            <h2>Thoughtful goods for your everyday rhythm</h2>
-          </div>
-        </div>
-
-        <div className="feature-grid">
-          {features.map((feature) => (
-            <div className="feature-card" key={feature}>
-              <div className="feature-icon">✓</div>
-              <p>{feature}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="container section-block">
-        <div className="section-header">
-          <div>
-            <span className="eyebrow">Popular categories</span>
-            <h2>Curated for a slower, brighter life</h2>
-          </div>
-        </div>
-        <div className="category-grid">
-          {categories.map((category) => (
-            <div key={category.name} className="category-card">
-              <span>{category.icon}</span>
-              <h3>{category.name}</h3>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="container section-block">
-        <div className="section-header">
-          <div>
-            <span className="eyebrow">Featured picks</span>
-            <h2>Best sellers you’ll love</h2>
-          </div>
-          <Link to="/shop" className="inline-link">View all</Link>
-        </div>
-
-        <div className="product-grid">
-          {featured.map((product) => (
-            <ProductCard key={product._id} product={product} />
-          ))}
-        </div>
-      </section>
-
-      <section className="container showcase-panel">
-        <div className="showcase-copy">
-          <span className="eyebrow">Why GreenCart</span>
-          <h3>Beautiful products without the waste.</h3>
-          <p>We combine intentional sourcing, premium design, and everyday usefulness so your home and routine feel lighter.</p>
-        </div>
-        <div className="stats-row">
-          <div>
-            <strong>100%</strong>
-            <span>Responsible sourcing</span>
-          </div>
-          <div>
-            <strong>48h</strong>
-            <span>Fast delivery</span>
-          </div>
-          <div>
-            <strong>4.9/5</strong>
-            <span>Customer rating</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="container section-block testimonials-block">
-        <div className="section-header">
-          <div>
-            <span className="eyebrow">What people say</span>
-            <h2>Customers love the feeling</h2>
-          </div>
-        </div>
-
-        <div className="testimonial-grid">
-          {testimonials.map((item) => (
-            <div className="testimonial-card" key={item.name}>
-              <div className="stars">★★★★★</div>
-              <p>“{item.quote}”</p>
-              <div className="testimonial-person">
-                <strong>{item.name}</strong>
-                <span>{item.role}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function HeroSlider() {
-  const scrollOffset = useScrollParallax();
-
-  const currentSlide = heroSlides[0];
-
-  return (
-    <section className="hero-section">
-      <div className="container hero-layout" style={{ '--hero-scroll': `${scrollOffset}px`, backgroundImage: `linear-gradient(105deg, rgba(8, 35, 25, 0.78), rgba(8, 35, 25, 0.12)), url(${currentSlide.image})` }}>
-        <div className="hero-copy">
-          <span className="eyebrow hero-badge">{currentSlide.badge}</span>
-          <h1>{currentSlide.title}</h1>
-          <p>{currentSlide.subtitle}</p>
-          <div className="hero-actions">
-            <Link to="/shop" className="primary-button">Shop now</Link>
-            <Link to="/dashboard" className="secondary-button light-button">Open dashboard</Link>
-          </div>
-          <div className="impact-row">
-            <div>
-              <strong>12k+</strong>
-              <span>happy shoppers</span>
-            </div>
-            <div>
-              <strong>98%</strong>
-              <span>customer love</span>
-            </div>
-            <div>
-              <strong>4.9/5</strong>
-              <span>average rating</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-  );
-}
-
-function ShopPage() {
-  const { products } = useContext(AppContext);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, search, selectedCategory]);
-
-  return (
-    <div className="container section-block page-shell">
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">Shop collection</span>
-          <h2>Curated for everyday green living</h2>
-        </div>
-      </div>
-
-      <div className="toolbar">
-        <input
-          type="text"
-          value={search}
-          placeholder="Search products"
-          onChange={(event) => setSearch(event.target.value)}
-        />
-
-        <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
-          <option value="All">All</option>
-          {['Produce', 'Wellness', 'Lifestyle', 'Home'].map((category) => (
-            <option value={category} key={category}>{category}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="product-grid">
-        {filteredProducts.map((product) => (
-          <ProductCard key={product._id} product={product} />
-        ))}
-      </div>
-
-      {!filteredProducts.length && (
-        <div className="empty-state">No products match your search yet.</div>
-      )}
-    </div>
-  );
-}
-
-function ProductDetailsPage() {
-  const { id } = useParams();
-  const { getProductById, addToCart } = useContext(AppContext);
-  const [product, setProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [selectedImage, setSelectedImage] = useState('');
-
-  useEffect(() => {
-    const loadProduct = async () => {
-      const productData = await getProductById(id);
-      setProduct(productData);
-      setSelectedImage(productData.image?.[0] || '');
-    };
-
-    loadProduct();
-  }, [id, getProductById]);
-
-  if (!product) {
-    return <div className="loading-shell">Loading product...</div>;
-  }
-
-  return (
-    <div className="container section-block">
-      <div className="product-detail">
-        <div className="detail-gallery">
-          <div className="detail-image-wrap main-image-wrap">
-            <img src={selectedImage || product.image?.[0]} alt={product.name} />
-          </div>
-          <div className="thumb-row">
-            {(product.image || []).map((image, index) => (
-              <button key={`${image}-${index}`} className={`thumb ${selectedImage === image ? 'active' : ''}`} onClick={() => setSelectedImage(image)}>
-                <img src={image} alt={`${product.name} ${index + 1}`} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="detail-info">
-          <span className="eyebrow">{product.category}</span>
-          <h2>{product.name}</h2>
-          <div className="price-row">
-            <strong>{currency(product.offerPrice || product.price)}</strong>
-            {product.offerPrice && <span>{currency(product.price)}</span>}
-          </div>
-
-          <p>{product.description}</p>
-
-          <div className="quantity-picker">
-            <button onClick={() => setQuantity((current) => Math.max(1, current - 1))}>-</button>
-            <span>{quantity}</span>
-            <button onClick={() => setQuantity((current) => current + 1)}>+</button>
-          </div>
-
-          <div className="detail-actions">
-            <button className="primary-button" onClick={() => addToCart(product, quantity)}>Add to cart</button>
-            <Link to="/shop" className="secondary-button">Continue shopping</Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CartPage() {
-  const { cart, products, updateQuantity, removeFromCart } = useContext(AppContext);
-
-  const items = useMemo(() => {
-    return cart
-      .map((item) => {
-        const product = products.find((entry) => entry._id === item.product);
-        if (!product) return null;
-        return { ...item, product };
-      })
-      .filter(Boolean);
-  }, [cart, products]);
-
-  const subtotal = items.reduce((sum, item) => sum + Number(item.product.offerPrice || item.product.price) * item.quantity, 0);
-
-  if (!items.length) {
-    return (
-      <div className="container section-block">
-        <div className="empty-state large-empty">
-          <h3>Your cart is empty</h3>
-          <Link to="/shop" className="primary-button">Explore products</Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container section-block page-shell">
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">Your bag</span>
-          <h2>Ready for checkout</h2>
-        </div>
-      </div>
-
-      <div className="cart-layout">
-        <div className="cart-items">
-          {items.map((item) => (
-            <div key={item.product._id} className="cart-item">
-              <img src={item.product.image?.[0]} alt={item.product.name} />
-              <div className="cart-item-details">
-                <h3>{item.product.name}</h3>
-                <p>{item.product.category}</p>
-                <strong>{currency(item.product.offerPrice || item.product.price)}</strong>
-              </div>
-
-              <div className="mini-quantity">
-                <button onClick={() => updateQuantity(item.product._id, item.quantity - 1)}>-</button>
-                <span>{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.product._id, item.quantity + 1)}>+</button>
-              </div>
-
-              <button className="text-button" onClick={() => removeFromCart(item.product._id)}>Remove</button>
-            </div>
-          ))}
-        </div>
-
-        <aside className="checkout-summary">
-          <h3>Order summary</h3>
-          <div className="summary-row"><span>Subtotal</span><strong>{currency(subtotal)}</strong></div>
-          <div className="summary-row"><span>Shipping</span><strong>Free</strong></div>
-          <div className="summary-row total"><span>Total</span><strong>{currency(subtotal)}</strong></div>
-          <Link to="/checkout" className="primary-button full-button">Proceed to checkout</Link>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function CheckoutPage() {
-  const navigate = useNavigate();
-  const { user, placeOrder } = useContext(AppContext);
-  const [address, setAddress] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'USA',
-    phoneNumber: '',
-  });
-  const [message, setMessage] = useState('');
-
-  if (!user) {
-    return (
-      <div className="container section-block">
-        <div className="empty-state large-empty">
-          <h3>Please login to complete your order</h3>
-          <Link to="/login" className="primary-button">Login</Link>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const result = await placeOrder(address);
-    if (result.success) {
-      setMessage('Order placed successfully.');
-      navigate('/orders');
-      return;
-    }
-    setMessage(result.message || 'Unable to place order.');
-  };
-
-  return (
-    <div className="container section-block page-shell">
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">Secure checkout</span>
-          <h2>Delivery details</h2>
-        </div>
-      </div>
-
-      <form className="checkout-form" onSubmit={handleSubmit}>
-        <div className="form-grid">
-          <input placeholder="First name" value={address.firstName} onChange={(event) => setAddress({ ...address, firstName: event.target.value })} required />
-          <input placeholder="Last name" value={address.lastName} onChange={(event) => setAddress({ ...address, lastName: event.target.value })} required />
-          <input type="email" placeholder="Email" value={address.email} onChange={(event) => setAddress({ ...address, email: event.target.value })} required />
-          <input placeholder="Phone number" value={address.phoneNumber} onChange={(event) => setAddress({ ...address, phoneNumber: event.target.value })} required />
-          <input placeholder="City" value={address.city} onChange={(event) => setAddress({ ...address, city: event.target.value })} required />
-          <input placeholder="State" value={address.state} onChange={(event) => setAddress({ ...address, state: event.target.value })} required />
-          <input placeholder="Postal code" value={address.postalCode} onChange={(event) => setAddress({ ...address, postalCode: event.target.value })} required />
-          <input placeholder="Country" value={address.country} onChange={(event) => setAddress({ ...address, country: event.target.value })} required />
-        </div>
-
-        {message && <p className="form-message">{message}</p>}
-        <button className="primary-button" type="submit">Place order</button>
-      </form>
-    </div>
-  );
-}
-
-function OrdersPage() {
-  const { user } = useContext(AppContext);
+export default function App() {
+  const [products, setProducts] = useState(sampleProducts);
+  const [mode, setMode] = useState('loading');
+  const [user, setUser] = useState(null);
+  const [cart, setCart] = useState(() => { const value = readStorage('greencart-cart-v2', {}); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; });
+  const [favorites, setFavorites] = useState(() => { const value = readStorage('greencart-favorites', []); return Array.isArray(value) ? value : []; });
+  const [category, setCategory] = useState('All products');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState('featured');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [dealsOnly, setDealsOnly] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [toast, setToast] = useState('');
+  const [authMode, setAuthMode] = useState('login');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [orders, setOrders] = useState([]);
+  const [completedOrder, setCompletedOrder] = useState(null);
+  const [review, setReview] = useState(0);
+  const orderLock = useRef(false);
+  const cartSync = useRef(Promise.resolve());
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!user) {
-        setOrders([
-          {
-            _id: 'demo-order-1',
-            amount: 124.99,
-            status: 'Order Placed',
-            createdAt: new Date().toISOString(),
-            items: [{ product: { name: 'Organic Avocado Pack' } }],
-          },
-        ]);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/order/user`, { credentials: 'include' });
-        const data = await response.json();
-        if (data.success && Array.isArray(data.orders)) {
-          setOrders(data.orders);
+    let active = true;
+    api('/product/list').then(data => { if (active) { setProducts(data.products.map(normalizeProduct)); setMode('live'); } }).catch(() => { if (active) setMode('demo'); });
+    api('/user/is-Auth').then(async data => {
+      const saved = await api('/cart/').catch(() => ({ cartItems: [] }));
+      if (!active) return;
+      setCart(previous => {
+        const merged = { ...previous };
+        for (const item of saved.cartItems || []) {
+          const id = typeof item.product === 'object' ? item.product?._id : item.product;
+          if (id && Number.isInteger(item.quantity) && item.quantity > 0) merged[id] = Math.min(99, Math.max(merged[id] || 0, item.quantity));
         }
-      } catch (error) {
-        console.error('Order fetch failed:', error);
-      }
-    };
-
-    fetchOrders();
-  }, [user]);
-
-  return (
-    <div className="container section-block page-shell">
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">My orders</span>
-          <h2>Track your recent purchases</h2>
-        </div>
-      </div>
-
-      <div className="orders-list">
-        {orders.map((order) => (
-          <div key={order._id} className="order-card">
-            <div className="order-header">
-              <span>Order #{String(order._id).slice(-6)}</span>
-              <strong>{order.status || 'Order Placed'}</strong>
-            </div>
-            <p>{order.items?.length || 0} item(s)</p>
-            <div className="order-meta">
-              <span>{new Date(order.createdAt || Date.now()).toLocaleDateString()}</span>
-              <strong>{currency(order.amount || 0)}</strong>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AuthPage({ mode }) {
-  const navigate = useNavigate();
-  const { loginUser, registerUser } = useContext(AppContext);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [message, setMessage] = useState('');
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    const result = mode === 'login' ? await loginUser(formData) : await registerUser(formData);
-    if (result.success) {
-      navigate('/');
-      return;
-    }
-    setMessage(result.message || 'Something went wrong.');
-  };
-
-  return (
-    <div className="container auth-container">
-      <div className="auth-card">
-        <span className="eyebrow">{mode === 'login' ? 'Welcome back' : 'Create account'}</span>
-          <h2>{mode === 'login' ? 'Login to GreenCart' : 'Create your account'}</h2>
-
-        <form onSubmit={handleSubmit} className="auth-form">
-          {mode === 'register' && (
-            <input
-              type="text"
-              placeholder="Full name"
-              value={formData.name}
-              onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-              required
-            />
-          )}
-
-          <input
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-            required
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={(event) => setFormData({ ...formData, password: event.target.value })}
-            required
-          />
-
-          {message && <p className="form-message">{message}</p>}
-
-          <button className="primary-button full-button" type="submit">
-            {mode === 'login' ? 'Login' : 'Register'}
-          </button>
-        </form>
-
-        <p className="switch-link">
-          {mode === 'login' ? 'New here?' : 'Already a member?'}{' '}
-          <Link to={mode === 'login' ? '/register' : '/login'}>{mode === 'login' ? 'Create account' : 'Login'}</Link>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function SellerPage() {
-  const [sellerEmail, setSellerEmail] = useState('');
-  const [sellerPassword, setSellerPassword] = useState('');
-  const [sellerName, setSellerName] = useState('');
-  const [sellerAuthMode, setSellerAuthMode] = useState('login');
-  const [sellerLogged, setSellerLogged] = useState(false);
-  const [sellerMessage, setSellerMessage] = useState('');
-  const [sellerOrders, setSellerOrders] = useState([]);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    price: '',
-    offerPrice: '',
-    category: 'Organic Food',
-    inStock: true,
-  });
-  const [imageFiles, setImageFiles] = useState([]);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const loadSellerOrders = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/order/seller`, { credentials: 'include' });
-      const data = await response.json();
-      if (data.success && Array.isArray(data.orders)) {
-        setSellerOrders(data.orders);
-      }
-    } catch (error) {
-      console.error('Seller orders fetch failed:', error);
-    }
-  };
-
-  const handleSellerAuth = async (event) => {
-    event.preventDefault();
-
-    const endpoint = sellerAuthMode === 'register' ? `${API_BASE}/seller/register` : `${API_BASE}/seller/login`;
-    const payload = sellerAuthMode === 'register'
-      ? { name: sellerName, email: sellerEmail, password: sellerPassword }
-      : { email: sellerEmail, password: sellerPassword };
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
+        return merged;
       });
-      const data = await response.json();
+      setUser(data.user);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  useEffect(() => { saveStorage('greencart-cart-v2', cart); }, [cart]);
+  useEffect(() => { saveStorage('greencart-favorites', favorites); }, [favorites]);
+  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 3500); return () => clearTimeout(timer); }, [toast]);
+  useEffect(() => { setError(''); }, [modal, authMode]);
 
-      if (data.success) {
-        setSellerLogged(true);
-        setSellerMessage(sellerAuthMode === 'register' ? 'Seller registered successfully.' : 'Seller access granted.');
-        await loadSellerOrders();
-        return;
-      }
+  const items = products.filter(p => Number.isInteger(cart[p.id]) && cart[p.id] > 0).map(product => ({ product, quantity: cart[product.id] }));
+  const count = items.reduce((sum, item) => sum + item.quantity, 0);
+  const { subtotal, tax, total } = totals(items);
+  const visible = products.filter(p => (category === 'All products' || p.category === category) && p.name.toLowerCase().includes(query.toLowerCase().trim()) && (!favoritesOnly || favorites.includes(p.id)) && (!dealsOnly || p.originalPrice > p.price)).sort((a, b) => sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : sort === 'name' ? a.name.localeCompare(b.name) : 0);
+  const availableCategories = [...new Set([...categories.map(c => c.name), ...products.map(p => p.category)])];
 
-      setSellerMessage(data.message || 'Invalid seller credentials');
-    } catch (error) {
-      setSellerLogged(false);
-      setSellerMessage('Seller server is unavailable. Start the backend and try again.');
-      console.error('Seller auth failed:', error);
-    }
-  };
-
-  const handleStatusUpdate = async (orderId, status) => {
-    try {
-      await fetch(`${API_BASE}/order/${orderId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status }),
-      });
-      await loadSellerOrders();
-    } catch (error) {
-      console.error('Order status update failed:', error);
-    }
-  };
-
-  const handleAddProduct = async (event) => {
-    event.preventDefault();
-    setIsSaving(true);
-
-    try {
-      const formData = new FormData();
-      formData.append(
-        'productData',
-        JSON.stringify({
-          ...productForm,
-          price: Number(productForm.price),
-          offerPrice: Number(productForm.offerPrice || productForm.price),
-        })
-      );
-
-      imageFiles.forEach((file) => formData.append('images', file));
-
-      const response = await fetch(`${API_BASE}/product/add`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSellerMessage('Product added successfully.');
-        setProductForm({
-          name: '',
-          description: '',
-          price: '',
-          offerPrice: '',
-          category: 'Organic Food',
-          inStock: true,
-        });
-        setImageFiles([]);
-      } else {
-        if (response.status === 401 || response.status === 403) {
-          setSellerLogged(false);
-          setSellerMessage('Seller authorization expired. Please sign in again.');
-          return;
-        }
-        setSellerMessage(data.message || 'Unable to add product.');
-      }
-    } catch (error) {
-      setSellerMessage('Unable to reach the seller server. Check that the backend is running.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (!sellerLogged) {
-    return (
-      <div className="container auth-container">
-        <div className="auth-card seller-card">
-          <span className="eyebrow">Seller portal</span>
-          <h2>{sellerAuthMode === 'login' ? 'Manage your storefront' : 'Register as a seller'}</h2>
-          <form onSubmit={handleSellerAuth} className="auth-form">
-            {sellerAuthMode === 'register' && (
-              <input
-                type="text"
-                placeholder="Business or seller name"
-                value={sellerName}
-                onChange={(event) => setSellerName(event.target.value)}
-                required
-              />
-            )}
-            <input type="email" placeholder="Seller email" value={sellerEmail} onChange={(event) => setSellerEmail(event.target.value)} required />
-            <input type="password" placeholder="Seller password" value={sellerPassword} onChange={(event) => setSellerPassword(event.target.value)} required />
-            {sellerMessage && <p className="form-message">{sellerMessage}</p>}
-            <button className="primary-button full-button" type="submit">
-              {sellerAuthMode === 'login' ? 'Login as seller' : 'Register seller'}
-            </button>
-          </form>
-          <p className="switch-link">
-            {sellerAuthMode === 'login' ? 'Need an account?' : 'Already a seller?'}{' '}
-            <button className="inline-toggle" type="button" onClick={() => setSellerAuthMode((mode) => mode === 'login' ? 'register' : 'login')}>
-              {sellerAuthMode === 'login' ? 'Register now' : 'Login'}
-            </button>
-          </p>
-        </div>
-      </div>
-    );
+  function updateCart(id, delta) {
+    setCart(previous => {
+      const next = { ...previous };
+      next[id] = Math.max(0, Math.min(99, (Number(next[id]) || 0) + delta));
+      if (!next[id]) delete next[id];
+      return next;
+    });
   }
+  // Serialize signed-in cart writes so a slower older request cannot overwrite a newer one.
+  useEffect(() => {
+    if (!user || mode !== 'live') return;
+    const timer = setTimeout(() => {
+      const cartItems = Object.entries(cart).filter(([id]) => products.some(p => p.id === id)).map(([product, quantity]) => ({ product, quantity }));
+      cartSync.current = cartSync.current.catch(() => {}).then(() => api('/cart/update', { cartItems })).catch(() => setToast('Cart saved on this device. Account sync is temporarily unavailable.'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [cart, user, mode, products]);
 
-  return (
-    <div className="container section-block page-shell">
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">Vendor dashboard</span>
-          <h2>Track your GreenCart business</h2>
-        </div>
-      </div>
+  function shop(nextCategory = 'All products', deals = false) {
+    setCategory(nextCategory); setDealsOnly(deals); setFavoritesOnly(false); setQuery(''); setMobileMenu(false);
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+  }
+  function toggleFavorite(id) { setFavorites(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]); }
+  function open(next) { setError(''); setModal(next); setMobileMenu(false); }
+  async function authenticate(e) {
+    e.preventDefault(); setBusy(true); setError('');
+    const form = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      const data = await api(`/user/${authMode === 'register' ? 'register' : 'login'}`, form);
+      const saved = await api('/cart/').catch(() => ({ cartItems: [] }));
+      setCart(previous => {
+        const merged = { ...previous };
+        for (const item of saved.cartItems || []) { const id = typeof item.product === 'object' ? item.product?._id : item.product; if (id && Number.isInteger(item.quantity) && item.quantity > 0) merged[id] = Math.min(99, Math.max(merged[id] || 0, item.quantity)); }
+        return merged;
+      });
+      setUser(data.user); setModal(null); setToast(`Welcome${authMode === 'login' ? ' back' : ''}, ${data.user.name}!`);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+  async function showOrders() {
+    open('orders'); setBusy(true);
+    try { setOrders(mode === 'demo' ? readStorage('greencart-demo-orders', []) : (await api('/order/user')).orders); }
+    catch (err) { setError(user ? err.message : 'Sign in to see your orders.'); setOrders([]); }
+    finally { setBusy(false); }
+  }
+  function checkout() {
+    if (mode === 'loading') { setToast('Please wait while we connect to the store.'); return; }
+    if (!items.length) return;
+    if (items.some(item => !item.product.inStock)) { setError('Remove unavailable products before checking out.'); return; }
+    if (mode === 'live' && !user) { setAuthMode('login'); open('auth'); setToast('Please sign in, then continue checkout from your cart.'); return; }
+    open('checkout');
+  }
+  async function placeOrder(e) {
+    e.preventDefault(); if (orderLock.current || !items.length) return;
+    orderLock.current = true; setBusy(true); setError('');
+    const address = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      let order;
+      if (mode === 'demo') {
+        order = { _id: `DEMO-${Date.now().toString(36).toUpperCase()}`, createdAt: new Date().toISOString(), items, amount: total, address, status: 'Demo order', demo: true };
+        saveStorage('greencart-demo-orders', [order, ...readStorage('greencart-demo-orders', [])]);
+      } else {
+        const saved = await api('/address/add', { address });
+        const result = await api('/order/cod', { address: saved.address._id, items: items.map(({ product, quantity }) => ({ product: product.id, quantity })) });
+        order = result.order;
+      }
+      setCompletedOrder(order); setCart({}); setModal('success');
+    } catch (err) { setError(err.message); } finally { setBusy(false); orderLock.current = false; }
+  }
+  function Quantity({ product, quantity }) { return <div className="quantity"><button aria-label={`Remove one ${product.name}`} onClick={() => updateCart(product.id, -1)}><Minus size={14}/></button><span>{quantity}</span><button disabled={quantity >= 99} aria-label={`Add one ${product.name}`} onClick={() => updateCart(product.id, 1)}><Plus size={14}/></button></div>; }
+  function ProductCard({ product }) {
+    return <article className="product-card"><div className="product-image"><button className="image-link" onClick={() => { setSelected(product); open('product'); }} aria-label={`View ${product.name}`}><Img src={product.image} alt={product.name} loading="lazy"/></button>{product.badge && <span className={`product-badge ${product.badge.includes('OFF') ? 'sale' : ''}`}>{product.badge}</span>}<button className={`favorite ${favorites.includes(product.id) ? 'saved' : ''}`} aria-label={`${favorites.includes(product.id) ? 'Unsave' : 'Save'} ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><Heart size={16}/></button></div><div className="product-info"><span className="product-category">{product.category}</span><button className="product-name" onClick={() => { setSelected(product); open('product'); }}>{product.name}</button><span className="unit">{product.unit}</span><div className="product-bottom"><div><strong>{money(product.price)}</strong>{product.originalPrice > product.price && <del>{money(product.originalPrice)}</del>}</div>{cart[product.id] ? <Quantity product={product} quantity={cart[product.id]}/> : <button className="add-button" disabled={!product.inStock} aria-label={`Add ${product.name} to cart`} onClick={() => { updateCart(product.id, 1); setToast(`${product.name} added to your cart`); }}>{product.inStock ? <><Plus size={15}/> Add</> : 'Sold out'}</button>}</div></div></article>;
+  }
+  const reviews = [
+    { quote: 'The kind of freshness you can taste. My weekly shop is now the easiest part of my week!', name: 'Sarah Mitchell', role: 'Home cook & happy customer', image: 'photo-1580489944761-15a19d654956' },
+    { quote: 'Beautiful produce, thoughtful packaging, and everything I need for a weekend full of cooking.', name: 'James Wilson', role: 'Food lover & happy customer', image: 'photo-1500648767791-00dcc994a43e' },
+    { quote: 'From breakfast essentials to dinner ingredients, it all arrives fresh. A little everyday luxury.', name: 'Emily Chen', role: 'Busy parent & happy customer', image: 'photo-1534528741775-53994a69daeb' },
+  ];
 
-      <div className="seller-stats">
-        <div className="stat-box">
-          <strong>1,248</strong>
-          <span>Units sold</span>
-        </div>
-        <div className="stat-box">
-          <strong>$26.4k</strong>
-          <span>Revenue</span>
-        </div>
-        <div className="stat-box">
-          <strong>96%</strong>
-          <span>Satisfaction</span>
-        </div>
-      </div>
+  return <>
+    <div className="announcement"><span><Leaf size={13}/> A little fresher. A little greener. A whole lot better.</span><span>Fresh picks, delivered with care <Truck size={15}/></span></div>
+    <header className="header" id="home"><div className="container header-main"><Brand/><form className="search" role="search" onSubmit={e => { e.preventDefault(); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }}><Search size={18}/><input aria-label="Search groceries" placeholder="Search for fresh groceries..." value={query} onChange={e => { setQuery(e.target.value); setCategory('All products'); setFavoritesOnly(false); setDealsOnly(false); }}/><button type="submit" aria-label="Submit search"><ArrowRight size={17}/></button></form><div className="header-actions"><button className="icon-button saved-header" aria-label="Saved products" onClick={() => { setFavoritesOnly(true); setCategory('All products'); setQuery(''); setDealsOnly(false); document.getElementById('products').scrollIntoView({ behavior: 'smooth' }); }}><Heart size={21}/>{favorites.length > 0 && <i>{favorites.length}</i>}</button><button className="icon-button" aria-label={user ? 'My account' : 'Sign in'} onClick={() => open(user ? 'account' : 'auth')}><UserRound size={21}/></button><span className="action-divider"/><button className="cart-button" onClick={() => open('cart')} aria-label={`Open cart, ${count} items`}><span><ShoppingCart size={21}/><i>{count}</i></span><span className="cart-label">Your cart<strong>{money(subtotal)}</strong></span></button><button className="icon-button mobile-toggle" aria-label="Toggle navigation" aria-expanded={mobileMenu} onClick={() => setMobileMenu(!mobileMenu)}>{mobileMenu ? <X/> : <Menu/>}</button></div></div><div className="nav-border"><nav className={`container navigation ${mobileMenu ? 'mobile-open' : ''}`} aria-label="Main navigation"><a className="all-categories" href="#categories" onClick={() => setMobileMenu(false)}><Menu size={18}/> All categories <ChevronDown size={14}/></a><div className="nav-links"><a className="active" href="#home" onClick={() => setMobileMenu(false)}>Home</a><button onClick={() => shop()}>Shop all</button><button onClick={() => shop('All products', true)}>Deals & offers <span className="tiny-badge">HOT</span></button><a href="#why-us" onClick={() => setMobileMenu(false)}>Why Freshora?</a><button onClick={showOrders}>My orders</button></div><span className="nav-note"><Truck size={16}/> Freshness, right to your door</span></nav></div></header>
 
-      <div className="seller-layout">
-        <div className="seller-panel">
-          <h3>Add new product</h3>
-          <form className="product-form" onSubmit={handleAddProduct}>
-            <input value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} placeholder="Product name" required />
-            <textarea value={productForm.description} onChange={(event) => setProductForm({ ...productForm, description: event.target.value })} placeholder="Description" rows="4" required />
-            <div className="product-form-grid">
-              <input type="number" value={productForm.price} onChange={(event) => setProductForm({ ...productForm, price: event.target.value })} placeholder="Price" required />
-              <input type="number" value={productForm.offerPrice} onChange={(event) => setProductForm({ ...productForm, offerPrice: event.target.value })} placeholder="Offer price" />
-            </div>
-            <select value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })}>
-              <option>Organic Food</option>
-              <option>Wellness</option>
-              <option>Home Goods</option>
-              <option>Eco Living</option>
-            </select>
-            <input type="file" accept="image/*" multiple onChange={(event) => setImageFiles(Array.from(event.target.files))} />
-            {sellerMessage && <p className="form-message">{sellerMessage}</p>}
-            <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Publish product'}</button>
-          </form>
-        </div>
+    <main>
+      <section className="container hero"><div className="hero-content"><span className="eyebrow"><span/> YOUR DAILY DOSE OF FRESH</span><h1>Fresh groceries.<br/><em>Happy days.</em><br/>Delivered.</h1><p>From farm-fresh favourites to everyday essentials.<br className="desktop-break"/> All the goodness you love, right at your doorstep.</p><div className="hero-buttons"><button className="button yellow" onClick={() => shop()}>Start shopping <ArrowUpRight size={19}/></button><a className="text-link" href="#categories">Explore categories <ArrowRight size={17}/></a></div><div className="hero-benefits"><div><span className="round-icon"><Truck size={19}/></span><p><strong>Fresh to your door</strong><small>Carefully packed, always</small></p></div><div><span className="round-icon"><Leaf size={19}/></span><p><strong>100% fresh & quality</strong><small>Good food. No compromises.</small></p></div></div></div><div className="hero-visual"><div className="hero-circle"/><img className="hero-person" src="/hero-groceries.png" alt="Friendly Freshora delivery person holding a box of fresh vegetables"/><div className="fresh-sticker"><Leaf size={21}/><span>FARM FRESH<br/><strong>every day</strong></span></div><div className="delivery-sticker"><span><PackageCheck size={23}/></span><div><strong>A box full of goodness</strong><small>Freshly picked. Happily delivered.</small></div><CheckCircle2 size={18}/></div><span className="hero-sparkle one">✳</span><span className="hero-sparkle two">✧</span></div></section>
 
-        <div className="seller-panel">
-          <h3>Admin order queue</h3>
-          <div className="admin-orders">
-            {sellerOrders.length ? (
-              sellerOrders.map((order) => (
-                <div className="admin-order-card" key={order._id}>
-                  <div className="order-header">
-                    <span>#{String(order._id).slice(-6)}</span>
-                    <strong>{order.status || 'Order Placed'}</strong>
-                  </div>
-                  <p>{order.items?.length || 0} products</p>
-                  <div className="admin-order-actions">
-                    {['Order Placed', 'Processing', 'Shipped', 'Delivered'].map((status) => (
-                      <button key={status} className={order.status === status ? 'status-chip active' : 'status-chip'} onClick={() => handleStatusUpdate(order._id, status)}>
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="form-message">No recent orders yet.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+      <section className="container categories-section" id="categories"><div className="section-heading"><div><span className="eyebrow">SOMETHING GOOD IN EVERY AISLE</span><h2>Shop by category<span className="heading-dot">.</span></h2></div><button className="text-link" onClick={() => shop()}>View all products <ArrowUpRight size={18}/></button></div><div className="category-grid">{categories.map(c => <button className="category-card" key={c.name} onClick={() => shop(c.name)}><div className="category-image" style={{ background: c.color }}><Img src={photo(c.image, 450)} alt={c.name} loading="lazy"/><span><ArrowUpRight size={18}/></span></div><h3>{c.name}</h3><p>{c.caption}</p></button>)}</div></section>
+
+      <section className="container promo-grid" aria-label="Fresh grocery collections"><article className="promo promo-green"><div><span className="promo-label"><Sparkles size={12}/> GOOD FOOD, BETTER DAYS</span><h2>A fresh start<br/>to your every day.</h2><p>Fill your basket with nature’s best.</p><button className="text-link" onClick={() => shop('Vegetables')}>Shop fresh produce <ArrowRight size={17}/></button></div><Img src={photo('photo-1540420773420-3366772f4999', 650)} alt="A vibrant selection of fresh vegetables" loading="lazy"/></article><article className="promo promo-peach"><div><span className="promo-label"><Heart size={12}/> LITTLE PRICES. BIG GOODNESS.</span><h2>Your favourites.<br/>Even better prices.</h2><p>Good things come in full baskets.</p><button className="text-link" onClick={() => shop('All products', true)}>Discover the offers <ArrowRight size={17}/></button></div><Img src={photo('photo-1619566636858-adf3ef46400b', 650)} alt="Fresh seasonal fruit selection" loading="lazy"/></article></section>
+
+      <section className="container products-section" id="products"><div className="section-heading"><div><span className="eyebrow">FRESH FINDS, EVERYDAY FAVOURITES</span><h2>{favoritesOnly ? 'Your saved favourites' : dealsOnly ? 'Good food. Great deals' : query ? 'Find your fresh favourites' : 'Your basket’s best friends'}<span className="heading-dot">.</span></h2></div><span className="product-count">{visible.length} fresh picks</span></div><div className="product-toolbar"><div className="tabs" aria-label="Filter products"><button className={category === 'All products' ? 'selected' : ''} onClick={() => setCategory('All products')}>All products</button>{availableCategories.map(c => <button key={c} className={category === c ? 'selected' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div><label className="sort"><SlidersHorizontal size={15}/><select aria-label="Sort products" value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A–Z</option></select></label></div>{mode === 'demo' && <p className="demo-note"><span/> You’re browsing our sample catalog. Demo orders won’t be charged or delivered.</p>}{(query || favoritesOnly || dealsOnly) && <div className="filter-summary"><span>{query ? `Results for “${query}”` : favoritesOnly ? 'Showing saved products' : 'Showing special offers'}</span><button onClick={() => { setQuery(''); setFavoritesOnly(false); setDealsOnly(false); setCategory('All products'); }}>Clear filters <X size={13}/></button></div>}<div className="products-grid">{visible.map(product => <ProductCard key={product.id} product={product}/>)}</div>{!visible.length && <div className="empty-state"><Search size={35}/><h3>No groceries found</h3><p>Try another search or explore a different aisle.</p><button className="button green" onClick={() => shop()}>Browse all products <ArrowRight size={16}/></button></div>}</section>
+
+      <section className="why-section" id="why-us"><div className="container"><div className="section-heading centered"><span className="eyebrow">A LITTLE MORE CARE IN EVERY CART</span><h2>Good for you. Great for your day<span className="heading-dot">.</span></h2><p>Because your everyday shop should feel anything but ordinary.</p></div><div className="benefit-grid">{[{ icon: Leaf, title: 'Freshness comes first', text: 'Thoughtfully selected produce and quality essentials, packed with care.' }, { icon: Truck, title: 'Your day, made easier', text: 'Skip the queues and the heavy bags. We bring your favourites to your door.' }, { icon: ShieldCheck, title: 'Goodness you can trust', text: 'Honest quality, thoughtful choices, and food you’ll feel good bringing home.' }, { icon: Heart, title: 'A little love, every day', text: 'From the first click to the last bite, we’re here to make your day a little better.' }].map(b => <div className="benefit" key={b.title}><span><b.icon size={26}/></span><h3>{b.title}</h3><p>{b.text}</p></div>)}</div></div></section>
+
+      <section className="container testimonials"><div className="review-intro"><span className="eyebrow">FRESH FOOD. HAPPY PEOPLE.</span><h2>A little love<br/>from our community<span className="heading-dot">.</span></h2><p>Good food brings people together.<br/>Here’s a taste of the Freshora experience.</p><div className="review-controls"><button className="icon-button" aria-label="Previous review" onClick={() => setReview((review + 2) % 3)}><ChevronLeft size={20}/></button><button className="icon-button" aria-label="Next review" onClick={() => setReview((review + 1) % 3)}><ChevronRight size={20}/></button><span>{String(review + 1).padStart(2, '0')} <i>/ 03</i></span></div></div><article className="review-card" aria-live="polite"><div className="stars">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={17} fill="currentColor"/>)}</div><blockquote>“{reviews[review].quote}”</blockquote><div className="review-author"><Img src={photo(reviews[review].image, 100)} alt={reviews[review].name} loading="lazy"/><div><strong>{reviews[review].name}</strong><small>{reviews[review].role}</small></div><span className="quote-mark">”</span></div><small className="sample-review">Illustrative customer story</small></article></section>
+
+      <section className="container bottom-banner"><div><span className="eyebrow">GOOD FOOD IS JUST A CLICK AWAY</span><h2>Less running around.<br/>More living well.</h2><p>Make room for the things you love. We’ll handle the groceries.</p></div><button className="button yellow" onClick={() => shop()}>Fill your basket <ShoppingBasket size={19}/></button><Leaf className="banner-leaf" size={160}/></section>
+    </main>
+    <footer className="container footer"><div className="footer-top"><div><Brand/><p>A little freshness. A lot of goodness.<br/>Your everyday grocery companion.</p></div><div><h3>Explore the aisles</h3><button onClick={() => shop('Vegetables')}>Fresh vegetables</button><button onClick={() => shop('Fruits')}>Seasonal fruits</button><button onClick={() => shop('Dairy & Eggs')}>Dairy & eggs</button></div><div><h3>Here to help</h3><button onClick={() => open('help')}>Delivery & returns</button><button onClick={showOrders}>Your orders</button><button onClick={() => open(user ? 'account' : 'auth')}>Your account</button></div><div className="footer-promise"><span><Leaf size={18}/> Fresh by nature.</span><p>Carefully selected.<br/>Thoughtfully delivered.<br/>Always Freshora.</p></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Freshora. A fresh take on everyday.</span><div><span><ShieldCheck size={14}/> Secure shopping</span><span><ShoppingBasket size={14}/> Pay on delivery</span></div></div></footer>
+    {toast && <div className="toast" role="status"><CheckCircle2 size={19}/><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast('')}><X size={15}/></button></div>}
+
+    {modal === 'product' && selected && <Dialog title="A closer look" onClose={() => setModal(null)} wide><div className="product-detail"><Img src={selected.image} alt={selected.name}/><div><span className="eyebrow">{selected.category}</span><h2>{selected.name}</h2><p>{selected.description}</p><p className="unit">{selected.unit}</p><div className="detail-price">{money(selected.price)} {selected.originalPrice > selected.price && <del>{money(selected.originalPrice)}</del>}</div><p className="stock-status">{selected.inStock ? <><Check size={16}/> In stock · Packed with care</> : 'Currently out of stock'}</p>{cart[selected.id] ? <Quantity product={selected} quantity={cart[selected.id]}/> : <button className="button green" disabled={!selected.inStock} onClick={() => { updateCart(selected.id, 1); setToast('Added to your cart'); }}><ShoppingCart size={18}/> Add to cart</button>}<button className="text-link detail-save" onClick={() => toggleFavorite(selected.id)}><Heart size={16} fill={favorites.includes(selected.id) ? 'currentColor' : 'none'}/>{favorites.includes(selected.id) ? 'Saved to favourites' : 'Save for later'}</button></div></div></Dialog>}
+    {modal === 'cart' && <Dialog title={`Your basket (${count})`} onClose={() => setModal(null)} wide>{items.length ? <><div className="cart-items">{items.map(({ product, quantity }) => <div className="cart-item" key={product.id}><Img src={product.image} alt={product.name}/><div className="cart-item-info"><strong>{product.name}</strong><small>{product.unit} · {money(product.price)} each</small><Quantity product={product} quantity={quantity}/></div><div className="cart-item-end"><strong>{money(product.price * quantity)}</strong><button className="icon-button" aria-label={`Remove ${product.name} from cart`} onClick={() => updateCart(product.id, -quantity)}><Trash2 size={17}/></button></div></div>)}</div><div className="order-summary"><p><span>Subtotal</span><strong>{money(subtotal)}</strong></p><p><span>Tax (18%)</span><span>{money(tax)}</span></p><p><span>Delivery</span><span className="green-text">Included</span></p><p className="total"><strong>Total</strong><strong>{money(total)}</strong></p></div>{error && <p className="form-error" role="alert">{error}</p>}<button className="button green full" onClick={checkout} disabled={mode === 'loading'}>{mode === 'demo' ? 'Continue to demo checkout' : 'Continue to checkout'} <ArrowRight size={18}/></button><button className="text-link centered-link" onClick={() => { setModal(null); shop(); }}>Keep shopping</button></> : <div className="empty-state"><ShoppingBasket size={46}/><h3>A little empty. Full of possibilities.</h3><p>Let’s find something fresh for your basket.</p><button className="button green" onClick={() => { setModal(null); shop(); }}>Explore groceries <ArrowRight size={17}/></button></div>}</Dialog>}
+    {modal === 'auth' && <Dialog title={authMode === 'login' ? 'Welcome back' : 'A fresh start'} onClose={() => { if (!busy) setModal(null); }}><p className="dialog-description">{authMode === 'login' ? 'Sign in for a smoother grocery run.' : 'Create your Freshora account.'}</p>{mode === 'demo' && <p className="notice">The store server is currently offline. Account access will be available when it reconnects. You can still explore the demo.</p>}<form className="form" onSubmit={authenticate}>{authMode === 'register' && <label>Your name<input name="name" autoComplete="name" required placeholder="Alex Green"/></label>}<label>Email address<input name="email" type="email" autoComplete="email" required placeholder="you@example.com"/></label><label>Password<input name="password" type="password" autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} minLength={authMode === 'register' ? 8 : 1} required placeholder={authMode === 'register' ? 'At least 8 characters' : 'Your password'}/></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="button green full" disabled={busy}>{busy ? 'Please wait…' : authMode === 'login' ? 'Sign in' : 'Create account'}<ArrowRight size={17}/></button></form><p className="auth-switch">{authMode === 'login' ? 'New around here?' : 'Already have an account?'} <button disabled={busy} onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>{authMode === 'login' ? 'Create an account' : 'Sign in'}</button></p></Dialog>}
+    {modal === 'account' && <Dialog title={`Hello, ${user?.name}`} onClose={() => setModal(null)}><p className="dialog-description">{user?.email}</p><div className="account-actions"><button className="button green" onClick={showOrders}>View my orders <PackageCheck size={18}/></button><button className="button outline" disabled={busy} onClick={async () => { setBusy(true); try { await api('/user/logout'); setUser(null); setCart({}); setModal(null); setToast('You’re signed out. See you soon!'); } catch (err) { setError(err.message); } finally { setBusy(false); } }}>Sign out</button></div>{error && <p className="form-error" role="alert">{error}</p>}</Dialog>}
+    {modal === 'checkout' && <Dialog title={mode === 'demo' ? 'Demo checkout' : 'Your fresh delivery'} onClose={() => { if (!busy) setModal(null); }} wide>{mode === 'demo' && <p className="notice">This is a demo. Use sample details; no payment is collected and no delivery will be arranged.</p>}<form className="form" onSubmit={placeOrder}><h3><MapPin size={18}/> Where should we deliver?</h3><div className="form-row"><label>First name<input name="firstName" autoComplete="given-name" required/></label><label>Last name<input name="lastName" autoComplete="family-name" required/></label></div><div className="form-row"><label>Email<input name="email" type="email" autoComplete="email" defaultValue={user?.email || ''} required/></label><label>Phone number<input name="phoneNumber" type="tel" autoComplete="tel" minLength={7} required/></label></div><label>Street address<input name="street" autoComplete="street-address" placeholder="House number and street" required/></label><div className="form-row"><label>City<input name="city" autoComplete="address-level2" required/></label><label>State / Province<input name="state" autoComplete="address-level1" required/></label></div><div className="form-row"><label>Postal code<input name="postalCode" autoComplete="postal-code" required/></label><label>Country<input name="country" autoComplete="country-name" required/></label></div><div className="payment-method"><span><CheckCircle2 size={21}/><strong>Cash on delivery</strong></span><small>Pay when your groceries arrive.</small></div><div className="order-summary"><p><span>{count} items</span><strong>{money(subtotal)}</strong></p><p><span>Tax (18%)</span><span>{money(tax)}</span></p><p><span>Delivery</span><span className="green-text">Included</span></p><p className="total"><strong>Total to pay</strong><strong>{money(total)}</strong></p></div>{error && <p className="form-error" role="alert">{error}</p>}<button className="button green full" disabled={busy || !items.length}>{busy ? 'Placing your order…' : mode === 'demo' ? 'Place demo order' : 'Place order'}<ArrowRight size={18}/></button></form></Dialog>}
+    {modal === 'success' && <Dialog title={completedOrder?.demo ? 'Demo complete!' : 'You’re all set!'} onClose={() => setModal(null)}><div className="success-content"><span><PackageCheck size={42}/></span><h2>{completedOrder?.demo ? 'That’s a basket full of goodness.' : 'Your fresh order is confirmed.'}</h2><p>{completedOrder?.demo ? 'Your sample order is saved on this device. No payment or delivery will take place.' : 'Thanks for shopping with Freshora. You can follow your order in My orders.'}</p><div className="confirmation"><span>Order #{completedOrder?._id?.slice(-10).toUpperCase()}</span><strong>{money(completedOrder?.amount || total)}</strong></div><button className="button green full" onClick={showOrders}>View my orders <ArrowRight size={18}/></button></div></Dialog>}
+    {modal === 'orders' && <Dialog title="Your orders" onClose={() => setModal(null)} wide>{busy ? <p className="empty-state">Loading your orders…</p> : error ? <div className="empty-state"><p className="form-error" role="alert">{error}</p>{!user && <button className="button green" onClick={() => open('auth')}>Sign in</button>}</div> : orders.length ? <div className="orders-list">{[...orders].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(order => <article className="order-card" key={order._id}><div><strong>#{order._id.slice(-10).toUpperCase()}</strong><span className="status-pill">{order.status}</span></div><small>{order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Just now'}</small>{order.items?.map((item,i) => <p key={i}>{item.quantity} × {item.product?.name || 'Grocery item'}</p>)}<strong>{money(order.amount)}</strong>{order.demo && <p className="unit">Demo only · no payment or delivery</p>}</article>)}</div> : <div className="empty-state"><PackageCheck size={42}/><h3>Your next good meal starts here.</h3><p>No orders yet. Fill your basket with something fresh.</p><button className="button green" onClick={() => { setModal(null); shop(); }}>Start shopping</button></div>}</Dialog>}
+    {modal === 'help' && <Dialog title="A little help with your order" onClose={() => setModal(null)}><div className="help-content"><h3><Truck size={20}/> Delivery</h3><p>Enter your full delivery address at checkout. Delivery is included in the displayed total. Your order status is available in My orders.</p><h3><ShoppingBasket size={20}/> Payment</h3><p>This storefront supports cash on delivery. Your basket shows the item total and 18% tax before you place your order.</p><h3><PackageCheck size={20}/> Order support & returns</h3><p>Keep your order reference for any order enquiries. A customer support contact and returns policy have not yet been configured by this store.</p>{mode === 'demo' && <p className="notice">You are currently using the sample storefront. Demo orders are stored only on this device.</p>}</div></Dialog>}
+  </>;
 }
-
-export default App;
